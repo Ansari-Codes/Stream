@@ -1,0 +1,3 @@
+
+class StreamBlockage(Exception):
+    pass

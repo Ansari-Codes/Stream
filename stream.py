@@ -42,7 +42,7 @@ def run_test(test_name, code, variables_to_print=None, expected_output=None, sho
         sys.stdout = captured_output = StringIO()
         
         try:
-            exec(converted, {'__stream_true' : True, '__stream_false': False})
+            exec(converted)
             output = captured_output.getvalue()
             sys.stdout = old_stdout
             

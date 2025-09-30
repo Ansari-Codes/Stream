@@ -196,7 +196,10 @@ class Converter:
 class Generator:
     def __init__(self, code = None):
         self.ast = code or []
-        self.variables = [{}]
+        self.variables = [
+            {'name': 'true', 'is_const': True},
+            {'name': 'false', 'is_const': True},
+            ]
         self.functions = [{}]
     
     def find_in_vars(self, value, by='name'):
@@ -205,7 +208,7 @@ class Generator:
     
     def convert(self):
         histroy = []
-        lines = ['from baseLib import *']
+        lines = ['from baseLib import *', '___stream_true = True\n___stream_false = False']
         for idx, i in enumerate(self.ast):
             ind = " " * i.indent
             if isi(i, (Variable, Constant)):

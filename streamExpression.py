@@ -3,97 +3,189 @@ from streamBlockages import StreamBlockage
 from baseLib import number, string
 
 class Expression:
-    def __init__(self, expr, operators=None, variables=None, functions=None, builtins = None):
+    def __init__(self, expr, operators=None, variables=None, functions=None, builtins=None):
         self.builtins = builtins or []
-        self.expr: str = expr.strip()
-        operators = operators or {}
-        # operators: stream notation → replacement
-        self.operators = dict(operators)
-        # Sort operators by length descending
+        self.expr = expr.strip()
+        self.operators = operators or {}
         self.sorted_ops = sorted(self.operators.keys(), key=lambda op: -len(op))
         varis = variables or []
         functions = functions or []
         self.defined = [i.get('name') for i in varis] + [i.get('name') for i in functions] + self.builtins
 
-    def flatten(self):
+    def flatten_expr(self, expr):
+        """Flatten expression into tokens, preserving chains and arguments."""
         tokens = []
         i = 0
-        expr_len = len(self.expr)
-        while i < expr_len:
-            if self.expr[i].isspace():
+        n = len(expr)
+
+        while i < n:
+            c = expr[i]
+            if c.isspace():
                 i += 1
                 continue
-            # string literal
-            if self.expr[i] in '"\'':
-                quote = self.expr[i]
-                i += 1
+
+            # String literal
+            if c in '"\'':
+                quote = c
                 start = i
-                while i < expr_len:
-                    if self.expr[i] == '\\':  # skip escaped char
+                i += 1
+                while i < n:
+                    if expr[i] == '\\':
                         i += 2
-                    elif self.expr[i] == quote:
+                    elif expr[i] == quote:
                         break
                     else:
                         i += 1
-                tokens.append(self.expr[start-1:i+1])  # include quotes
+                tokens.append(expr[start:i+1])
                 i += 1
                 continue
+
             # Operators
             matched = False
             for op in self.sorted_ops:
-                if self.expr[i:i+len(op)] == op:
+                if expr[i:i+len(op)] == op:
                     tokens.append(op)
                     i += len(op)
                     matched = True
                     break
             if matched:
                 continue
-            # numbers, variables, functions, method names
-            start = i
-            if self.expr[i].isalpha() or self.expr[i] == "_":
-                # identifiers (variables, functions, methods like to_number)
+
+            # Number
+            if c.isdigit() or (c == '.' and i+1 < n and expr[i+1].isdigit()):
+                start = i
                 i += 1
-                while i < expr_len and (self.expr[i].isalnum() or self.expr[i] == "_"):
+                while i < n and (expr[i].isdigit() or expr[i] == '.'):
                     i += 1
-            elif self.expr[i].isdigit() or (self.expr[i] == "." and i + 1 < expr_len and self.expr[i+1].isdigit()):
-                # numbers (support floats like 3.14)
+                tokens.append(expr[start:i])
+                continue
+
+            # Identifier / chains
+            if c.isalpha() or c == '_':
+                start = i
                 i += 1
-                while i < expr_len and (self.expr[i].isdigit() or self.expr[i] == "."):
+                while i < n and (expr[i].isalnum() or expr[i] == '_'):
                     i += 1
-            else:
-                i += 1
-            token = self.expr[start:i]
-            if token:
+                token = expr[start:i]
+
+                # Collect .properties/methods and parentheses recursively
+                while i < n and expr[i] in '.(':
+                    if expr[i] == '.':
+                        chain_start = i
+                        i += 1
+                        # next identifier
+                        if i < n and (expr[i].isalpha() or expr[i] == '_'):
+                            start = i
+                            i += 1
+                            while i < n and (expr[i].isalnum() or expr[i] == '_'):
+                                i += 1
+                            token += expr[chain_start:i]
+                        else:
+                            raise StreamBlockage(f"Invalid property access in: {expr}")
+                    elif expr[i] == '(':
+                        # parse balanced parentheses
+                        parens = 1
+                        start = i
+                        i += 1
+                        while i < n and parens > 0:
+                            if expr[i] == '(':
+                                parens += 1
+                            elif expr[i] == ')':
+                                parens -= 1
+                            i += 1
+                        token += expr[start:i]
                 tokens.append(token)
+                continue
+
+            # Anything else
+            tokens.append(c)
+            i += 1
+
         return tokens
 
-    def toPy(self):
-        py_expr = []
-        for token in self.flatten():
-            token_str = str(token)
-            # string literal
-            # only "..." can be string. Parser will convert mutliline to "...\n...". So, no worries.
-            if token_str.startswith('"') and token_str.endswith('"'):
-                inner = token_str[1:-1].replace("\\", "\\\\")
-                py_expr.append(f"string('{inner}')")
-            # Operators
-            elif token_str in self.operators:
-                py_expr.append(self.operators[token_str])
-            # Variables / functions
-            elif token_str in self.defined:
-                if token_str in self.builtins:
-                    py_expr.append(token_str)
-                else:
-                    py_expr.append(f"___stream_{token_str}")
-            # numbers
-            elif re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', token_str):
-                py_expr.append(token_str)
+    def convert_token(self, token):
+        """Convert a single token recursively."""
+        token_str = str(token)
+
+        # String
+        if token_str.startswith('"') and token_str.endswith('"'):
+            inner = token_str[1:-1]
+            return f"string('{inner}')"
+
+        # Operator
+        if token_str in self.operators:
+            return self.operators[token_str]
+
+        # Number
+        try:
+            float(token_str)
+            return f"number({token_str})"
+        except ValueError:
+            pass
+
+        # Function/property chain
+        m = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)(.*)$', token_str)
+        if m:
+            root, rest = m.groups()
+            if root not in self.defined:
+                raise StreamBlockage(f"Undefined token: '{root}' in expression: {self.expr}")
+            if root in self.builtins:
+                prefix = root
             else:
-                try:
-                    float(token_str)
-                    py_expr.append(f"number({token_str})")
-                except ValueError:
-                    raise StreamBlockage(f"Undefined token: '{token_str}' in expression: {self.expr}")
+                prefix = 'stream__' + root
 
-        return ''.join(py_expr)
+            # Process arguments in parentheses recursively
+            def process_rest(s):
+                res = ''
+                i = 0
+                n = len(s)
+                while i < n:
+                    if s[i] == '(':
+                        # find matching ')'
+                        parens = 1
+                        start = i
+                        i += 1
+                        while i < n and parens > 0:
+                            if s[i] == '(':
+                                parens += 1
+                            elif s[i] == ')':
+                                parens -= 1
+                            i += 1
+                        # recursive conversion inside parentheses
+                        inside = s[start+1:i-1]
+                        converted_inside = Expression(inside,
+                                                    self.operators,
+                                                    [{'name':k} for k in self.defined],
+                                                    [],
+                                                    self.builtins).toPy()
+                        res += '(' + converted_inside + ')'
+                    elif s[i] == '.':
+                        res += '.'
+                        i += 1
+                        # next identifier
+                        start = i
+                        while i < n and (s[i].isalnum() or s[i]=='_'):
+                            i += 1
+                        sub_id = s[start:i]
+                        if sub_id in self.builtins:
+                            res += sub_id
+                        else:
+                            res += 'stream__' + sub_id
+                    else:
+                        res += s[i]
+                        i += 1
+                return res
 
+            return prefix + process_rest(rest)
+
+        # Single identifier
+        if token_str in self.defined:
+            if token_str in self.builtins:
+                return token_str
+            return 'stream__' + token_str
+
+        raise StreamBlockage(f"Undefined token: '{token_str}' in expression: {self.expr}")
+
+    def toPy(self):
+        tokens = self.flatten_expr(self.expr)
+        return ''.join([self.convert_token(t) for t in tokens])

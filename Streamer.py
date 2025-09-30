@@ -205,7 +205,7 @@ class Generator:
                 value = Expression(i.value, Operator.operators, self.variables, self.functions, streamTypes).toPy()
                 name = i.name
                 is_const = isi(i, Constant)
-                lines.append(f'{ind}___stream_{name} = {value}')
+                lines.append(f'{ind}stream__{name} = {value}')
                 self.variables.append({
                     'name': name,
                     'is_const': is_const,
@@ -232,14 +232,13 @@ class Generator:
 init(autoreset=True)
 
 code = """
-x = 2 + 4 - True
-msg = string().to_number()
-(x == 0) ?
-    msg = "Zero"
-:( x > 0 )?
-    msg = "Pos"
+x = 10
+(x.is_int)?
+    msg = "It is int"
+:(!x.is_int)?
+    msg = "It is not int"
 :?
-    msg = "Neg"
+    msg = "It is zero"
 """
 
 if __name__ == "__main__":
@@ -263,13 +262,10 @@ if __name__ == "__main__":
         print(f" {line_number} {node!r}")
 
     # Execute and show results
-    converted += "\nprint('x =', ___stream_msg)"
+    converted += "\nprint('msg =', stream__msg)"
 
     try:
         exec(converted)
     except Exception as e:
         print(e)
 
-code = """
-
-"""

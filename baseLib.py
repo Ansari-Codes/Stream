@@ -49,19 +49,19 @@ class number(float):
     def __init__(self, value=0.0):
         self.value = float(value)
     
-    def is_int(self):
+    def stream__is_int(self):
         return boolean(True) if self.value.is_integer() else boolean(False)
     
-    def is_pos(self):
+    def stream__is_pos(self):
         return boolean(self.value > 0)
     
-    def is_zero(self):
+    def stream__is_zero(self):
         return boolean(self.value == 0)
     
-    def to_str(self):
+    def stream__to_str(self):
         return string(self.value)
     
-    def to_bool(self):
+    def stream__to_bool(self):
         return boolean(self.value)
 
     # Arithmetic
@@ -190,10 +190,10 @@ class string(str):
         return boolean(self.value >= str(other_val))
 
     # Type conversions
-    def to_number(self):
+    def stream__to_number(self):
         return number(float(self.value)) if self.value else Nil
 
-    def to_bool(self):
+    def stream__to_bool(self):
         return boolean(bool(self.value))
 
     # Representations
@@ -217,3 +217,5 @@ class _NilType:
         return self
 
 Nil = _NilType()
+true = boolean(True)
+false = boolean(False)

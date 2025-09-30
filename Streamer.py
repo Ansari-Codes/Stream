@@ -232,13 +232,11 @@ class Generator:
 init(autoreset=True)
 
 code = """
-x = 10
-(x.is_int)?
-    msg = "It is int"
-:(!x.is_int)?
-    msg = "It is not int"
+x = is_nil(nil)
+(x)?
+    msg = "It is nil"
 :?
-    msg = "It is zero"
+    msg = "It is not nil"
 """
 
 if __name__ == "__main__":

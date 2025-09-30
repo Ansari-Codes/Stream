@@ -107,41 +107,39 @@ class Expression:
         """Convert a single token recursively."""
         token_str = str(token)
 
-        # String
-        if token_str.startswith('"') and token_str.endswith('"'):
+        # String literal
+        if token_str.startswith('"') and token_str.endswith('"') or token_str.startswith("'") and token_str.endswith("'"):
             inner = token_str[1:-1]
             return f"string('{inner}')"
 
-        # Operator
-        if token_str in self.operators:
-            return self.operators[token_str]
-
-        # Number
+        # Number literal
         try:
             float(token_str)
             return f"number({token_str})"
         except ValueError:
             pass
 
-        # Function/property chain
+        # Operator
+        if token_str in self.operators:
+            return self.operators[token_str]
+
+        # Function/property chain or identifier
         m = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)(.*)$', token_str)
         if m:
             root, rest = m.groups()
+
             if root not in self.defined:
                 raise StreamBlockage(f"Undefined token: '{root}' in expression: {self.expr}")
-            if root in self.builtins:
-                prefix = root
-            else:
-                prefix = 'stream__' + root
 
-            # Process arguments in parentheses recursively
+            prefix = root if root in self.builtins else 'stream__' + root
+
             def process_rest(s):
                 res = ''
                 i = 0
                 n = len(s)
                 while i < n:
                     if s[i] == '(':
-                        # find matching ')'
+                        # parse parentheses recursively
                         parens = 1
                         start = i
                         i += 1
@@ -151,22 +149,21 @@ class Expression:
                             elif s[i] == ')':
                                 parens -= 1
                             i += 1
-                        # recursive conversion inside parentheses
                         inside = s[start+1:i-1]
-                        converted_inside = Expression(inside,
-                                                    self.operators,
-                                                    [{'name':k} for k in self.defined],
-                                                    [],
-                                                    self.builtins).toPy()
+                        converted_inside = Expression(
+                            inside, self.operators,
+                            [{'name': k} for k in self.defined],
+                            [], self.builtins
+                        ).toPy()
                         res += '(' + converted_inside + ')'
                     elif s[i] == '.':
                         res += '.'
                         i += 1
-                        # next identifier
                         start = i
-                        while i < n and (s[i].isalnum() or s[i]=='_'):
+                        while i < n and (s[i].isalnum() or s[i] == '_'):
                             i += 1
                         sub_id = s[start:i]
+                        # Treat numbers, strings, builtins, or variables correctly
                         if sub_id in self.builtins:
                             res += sub_id
                         else:
@@ -180,9 +177,7 @@ class Expression:
 
         # Single identifier
         if token_str in self.defined:
-            if token_str in self.builtins:
-                return token_str
-            return 'stream__' + token_str
+            return token_str if token_str in self.builtins else 'stream__' + token_str
 
         raise StreamBlockage(f"Undefined token: '{token_str}' in expression: {self.expr}")
 

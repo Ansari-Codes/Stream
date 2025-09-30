@@ -1,4 +1,8 @@
-streamTypes = ['boolean', 'number', 'string', 'nil', 'true', 'false']
+streamTypes = [
+    'boolean', 'number', 'string', 'nil', 'true', 'false',
+    'to_num', 'to_bool', 'to_str', 'is_zero', 'is_nil', 
+    'is_pos', 'is_int'
+    ]
 
 class boolean(int):
     def __new__(cls, value=1.0):
@@ -48,21 +52,6 @@ class number(float):
     
     def __init__(self, value=0.0):
         self.value = float(value)
-    
-    def stream__is_int(self):
-        return boolean(True) if self.value.is_integer() else boolean(False)
-    
-    def stream__is_pos(self):
-        return boolean(self.value > 0)
-    
-    def stream__is_zero(self):
-        return boolean(self.value == 0)
-    
-    def stream__to_str(self):
-        return string(self.value)
-    
-    def stream__to_bool(self):
-        return boolean(self.value)
 
     # Arithmetic
     def __add__(self, other):
@@ -189,13 +178,6 @@ class string(str):
         other_val = getattr(other, 'value', other)
         return boolean(self.value >= str(other_val))
 
-    # Type conversions
-    def stream__to_number(self):
-        return number(float(self.value)) if self.value else Nil
-
-    def stream__to_bool(self):
-        return boolean(bool(self.value))
-
     # Representations
     def __str__(self):
         return f'{self.value}'
@@ -203,9 +185,9 @@ class string(str):
     def __repr__(self):
         return f'string("{self.value}")'
 
-class _NilType:
+class _nilType:
     def __repr__(self):
-        return "Nil"
+        return "nil"
     
     def __bool__(self):
         return False
@@ -216,6 +198,15 @@ class _NilType:
     def __call__(self, *args, **kwargs):
         return self
 
-Nil = _NilType()
+nil = _nilType()
 true = boolean(True)
 false = boolean(False)
+
+# Basic utilities
+def is_nil(val): return val == nil
+def is_int(val): return boolean(True) if val.value.is_integer() else boolean(False)
+def is_pos(val): return boolean(val.value > 0)
+def is_zero(val): return boolean(val.value == 0)
+def to_str(val): return string(val.value)
+def to_bool(val): return boolean(val.value)
+def to_num(num): return number(float(num.value)) if num.value else nil

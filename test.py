@@ -86,7 +86,7 @@
 $fact[n]:
     (n == 0 || n == 1) ? -> 1
     result = 1
-    => i in 1..n:
+    => i :> 1..n:
         result = result * i
     -> result
 

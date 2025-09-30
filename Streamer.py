@@ -1,5 +1,6 @@
 from pprint import pprint
 from streamBasic import *
+from streamExpression import Expression
 from string import ascii_letters, digits
 from reDefs import reg
 
@@ -19,6 +20,7 @@ class Parser:
         in_comment = False
         buffer = ""
         line_start = True
+        in_escape = False
 
         def flush_buffer():
             nonlocal buffer
@@ -29,6 +31,13 @@ class Parser:
         for ch in self.code:
             # --- inside string ---
             if in_string:
+                if in_escape:
+                    buffer += ch
+                    in_escape = False
+                    continue
+                if ch == '\\':
+                    in_escape = True
+                    continue
                 if ch == '"':
                     if buffer:
                         tokens.append(String(buffer))
@@ -90,7 +99,7 @@ class Parser:
             if isi(i, (ComStart, Comment, StrStart, StrEnd)):
                 continue
             elif isi(i, String):
-                ast.append(String(i.value.replace('\n', '\\n')))
+                ast.append(String(i.value))
             elif isi(i, Code):
                 ast.append(i)
             elif isi(i, StatementEnd):
@@ -100,8 +109,8 @@ class Parser:
 PREFIX_WITH_GT = ['-', '>', '=', '~']
 
 class Converter:
-    def __init__(self, ast = []):
-        self.ast = ast
+    def __init__(self, ast = None):
+        self.ast = ast or []
     
     def _token(self, i: int) -> Code|None:
         if i < len(self.ast):
@@ -170,34 +179,84 @@ class Converter:
                     name, value = m
                     ast.append(Constant(name.strip(), value.strip(), indent))
                 elif typ == 'if':
-                    condition = m
-                    ast.append(IF(condition[0].strip(), indent))
+                    ast.append(IF(m[0].strip(), indent))
                 elif typ == 'elif':
-                    condition = m
-                    ast.append(Elif(condition[0].strip(), indent))
+                    ast.append(Elif(m[0].strip(), indent))
                 elif typ == 'else':
                     ast.append(Else(indent))
+                elif typ == 'func':
+                    name, params = m
+                    ast.append(Function(name, params, indent))
+                elif typ == 'return':
+                    ast.append(Return(m[0], indent))
             else:
                 raise StreamBlockage(f"Unexpected statement: {line}")
         return ast
 
-# Example
-code = """
-# This is a single line comment
-x = "This is
-string"
-! xy = 5
-y = "Hello world"
-!z=x + 10;a = y + "!"
-(x > 0)?
-    x = x + 1
-    (x == 2)?
-        !x = 2
-:(x < 0)?
-    x = x - 1
-:?
-    x = 0
-"""
-[print(i) for i in Converter(Parser(code).filterStringAndComments()).flatten()]
-print('-'*20)
-[print(i) for i in Converter(Parser(code).filterStringAndComments()).toAst()]
+class Generator:
+    def __init__(self, code = None):
+        self.ast = code or []
+        self.variables = [{}]
+        self.functions = [{}]
+    
+    def find_in_vars(self, value, by='name'):
+        return [i for i in self.variables
+                if i.get(by) == value]
+    
+    def convert(self):
+        histroy = []
+        lines = ['from baseLib import *']
+        for idx, i in enumerate(self.ast):
+            ind = " " * i.indent
+            if isi(i, (Variable, Constant)):
+                name = i.name
+                value_str = i.value
+                is_const = isi(i, Constant)
+                exists = self.find_in_vars(name)
+                exists = exists[0] if exists else {}
+                
+                # Check for string literal assignment
+                if isinstance(value_str, str) and value_str.startswith('"') and value_str.endswith('"'):
+                    # Process string for interpolation
+                    string_content = value_str[1:-1]  # Remove quotes
+                    stream_string = String(string_content, self.variables, self.functions)
+                    ___stream_value = stream_string.to_python_string()
+                else:
+                    value = Expression(
+                        value_str,
+                        Operator.operators,
+                        variables=self.variables,
+                        functions=self.functions
+                    )
+                    ___stream_value = value.toPy()
+                
+                if exists and ind == exists.get('indent'):
+                    if exists.get('is_const'):
+                        raise StreamBlockage("You cannot re-assign a constant.")
+                    else:
+                        lines.append(f'{ind}___stream_{name} = {___stream_value}')
+                        exists.update({'value': value_str})
+                else:
+                    lines.append(f'{ind}___stream_{name} = {___stream_value}')
+                    self.variables.append({
+                        'name': name,
+                        'is_const': is_const,
+                        'value': value_str,
+                        'indent': ind,
+                        'id': len(self.variables)
+                    })
+            elif isi(i, (IF, Elif)):
+                condition = Expression(
+                        i.value,
+                        Operator.operators,
+                        variables=self.variables,
+                        functions=self.functions
+                    )
+                if isi(i, IF):
+                    lines.append(f'{ind}if {condition.toPy()}:')
+                elif isi(i, Elif):
+                    lines.append(f'{ind}elif {condition.toPy()}:')
+            elif isi(i, (Else)):
+                lines.append(f'{ind}else:')
+        return '\n'.join(lines)
+

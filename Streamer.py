@@ -4,7 +4,7 @@ from streamExpression import Expression
 from string import ascii_letters, digits
 from reDefs import reg
 from colorama import init, Fore, Style
-
+from baseLib import streamTypes
 letters = ascii_letters + digits
 
 isi = isinstance
@@ -202,48 +202,25 @@ class Generator:
         for idx, i in enumerate(self.ast):
             ind = " " * i.indent
             if isi(i, (Variable, Constant)):
+                value = Expression(i.value, Operator.operators, self.variables, self.functions, streamTypes).toPy()
                 name = i.name
-                value_str = i.value
                 is_const = isi(i, Constant)
-                exists = self.find_in_vars(name)
-                exists = exists[0] if exists else {}
-                # Check for string literal assignment
-                if (
-                    isinstance(value_str, str)
-                    and value_str.startswith('"')
-                    and value_str.endswith('"')
-                ):
-                    ___stream_value = value_str
-                else:
-                    value = Expression(
-                        value_str,
-                        Operator.operators,
-                        variables=self.variables,
-                        functions=self.functions
-                    )
-                    ___stream_value = value.toPy()
-                if exists and ind == exists.get('indent'):
-                    if exists.get('is_const'):
-                        raise StreamBlockage("You cannot re-assign a constant.")
-                    else:
-                        lines.append(f'{ind}___stream_{name} = {___stream_value}')
-                        exists.update({'value': value_str})
-                else:
-                    lines.append(f'{ind}___stream_{name} = {___stream_value}')
-                    self.variables.append({
-                        'name': name,
-                        'is_const': is_const,
-                        'value': value_str,
-                        'refs': 1,
-                        'indent': ind,
-                        'id': len(self.variables)
-                    })
+                lines.append(f'{ind}___stream_{name} = {value}')
+                self.variables.append({
+                    'name': name,
+                    'is_const': is_const,
+                    'value': value,
+                    'refs': 1,
+                    'indent': ind,
+                    'id': len(self.variables)
+                })
             elif isi(i, (IF, Elif)):
                 condition = Expression(
                         i.value,
                         Operator.operators,
                         variables=self.variables,
-                        functions=self.functions
+                        functions=self.functions,
+                        builtins=streamTypes
                     )
                 if isi(i, IF):
                     lines.append(f'{ind}if {condition.toPy()}:')
@@ -286,3 +263,7 @@ if __name__ == "__main__":
         exec(converted)
     except Exception as e:
         print(e)
+
+code = """
+
+"""

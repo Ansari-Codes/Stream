@@ -1,3 +1,4 @@
+streamTypes = ['Bool', 'Number', 'String']
 class Bool(int):
     """
     Fully-featured custom Bool class.
@@ -134,6 +135,9 @@ class Number(float):
         return Bool(True) if self.value <= float(getattr(other, 'value', other)) else Bool(False)
 
     def __str__(self):
+        return f"{self.value}"
+    
+    def __repr__(self) -> str:
         return f"Number({self.value})"
 
 class String(str):
@@ -197,7 +201,7 @@ class String(str):
 
     # Representations
     def __str__(self):
-        return f'String("{self.value}")'
+        return f'{self.value}'
 
     def __repr__(self):
         return f'String("{self.value}")'

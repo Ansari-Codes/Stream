@@ -210,7 +210,6 @@ class Generator:
                     'name': name,
                     'is_const': is_const,
                     'value': value,
-                    'refs': 1,
                     'indent': ind,
                     'id': len(self.variables)
                 })
@@ -223,9 +222,9 @@ class Generator:
                         builtins=streamTypes
                     )
                 if isi(i, IF):
-                    lines.append(f'{ind}if {condition.toPy()}:')
+                    lines.append(f'{ind}if bool({condition.toPy()}):')
                 elif isi(i, Elif):
-                    lines.append(f'{ind}elif {condition.toPy()}:')
+                    lines.append(f'{ind}elif bool({condition.toPy()}):')
             elif isi(i, (Else)):
                 lines.append(f'{ind}else:')
         return '\n'.join(lines)
@@ -233,7 +232,14 @@ class Generator:
 init(autoreset=True)
 
 code = """
-x = 2 + 4
+x = 2 + 4 - True
+msg = string().to_number()
+(x == 0) ?
+    msg = "Zero"
+:( x > 0 )?
+    msg = "Pos"
+:?
+    msg = "Neg"
 """
 
 if __name__ == "__main__":
@@ -241,7 +247,7 @@ if __name__ == "__main__":
     ast = Converter(parser.filterStringAndComments()).toAst()
 
     # Print AST
-    print(f"{Fore.GREEN}|{'-'*10}< AST >{'-'*10}|{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}|{'-'*12}< AST >{'-'*12}|{Style.RESET_ALL}")
     width = len(str(len(ast)))
     for j, node in enumerate(ast):
         line_number = str(j + 1).rjust(width)
@@ -257,7 +263,7 @@ if __name__ == "__main__":
         print(f" {line_number} {node!r}")
 
     # Execute and show results
-    converted += "\nprint('x =', ___stream_x)"
+    converted += "\nprint('x =', ___stream_msg)"
 
     try:
         exec(converted)

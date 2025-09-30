@@ -21,7 +21,7 @@ def run_test(test_name, code, variables_to_print=None, expected_output=None, sho
         # Generate Python
         print(f"\n{Fore.GREEN}|{'-'*10}< PYTHON >{'-'*10}|{Style.RESET_ALL}")
         gen = Generator(ast)
-        converted = "from baseLib import *" + ";\n" + gen.convert()
+        converted = gen.convert()
         
         # Add print statements for variables after conversion
         if variables_to_print:
@@ -131,8 +131,93 @@ check = num > 3
     },
 ]
 
-# Run all tough tests
-for i,test in enumerate(tough_tests):
+extra_tough_tests = [
+    {
+        "name": "Boolean Logic and Precedence",
+        "code": r"""
+x = 10
+y = 20
+z = (x < y) & (y > 5) | (x == 0)
+""",
+        "variables_to_print": ['x', 'y', 'z'],
+    },
+    {
+        "name": "Nested Parentheses and Mixed Types",
+        "code": r"""
+a = 2
+b = 3
+c = "Value: " + String((a + b) * (a - b) * (a + 10))
+""",
+        "variables_to_print": ['a', 'b', 'c'],
+    },
+    {
+        "name": "String with Escaped Quotes",
+        "code": r"""
+msg = "He said: \"Hello!\" and left"
+""",
+        "variables_to_print": ['msg'],
+    },
+    {
+        "name": "Chained Comparisons",
+        "code": r"""
+x = 5
+check = x > 1 & x < 10
+""",
+        "variables_to_print": ['x', 'check'],
+    },
+    {
+        "name": "Long Operator Sequence",
+        "code": r"""
+x = 2
+y = 3
+z = (x + y) * (x - y) / (x + 1) // (y - 1) % 2
+""",
+        "variables_to_print": ['x', 'y', 'z'],
+    },
+    {
+        "name": "Unary Minus and Plus",
+        "code": r"""
+x = -5
+y = +10
+z = x + y
+""",
+        "variables_to_print": ['x', 'y', 'z'],
+    },
+    {
+        "name": "Deeply Nested Expressions",
+        "code": r"""
+n = 2
+result = (((n+1) * (n+2)) + ((n+3) * (n+4))) * (n+5)
+""",
+        "variables_to_print": ['n', 'result'],
+    },
+    {
+        "name": "Concatenation of Mixed Strings and Numbers",
+        "code": r"""
+a = 7
+b = 8
+msg = "Sum=" + String(a+b) + ", Product=" + String(a*b)
+""",
+        "variables_to_print": ['a', 'b', 'msg'],
+    },
+    {
+        "name": "Boolean Arithmetic Combo",
+        "code": r"""
+x = 1
+y = 0
+truthy = (x & !y) | (y | x)
+""",
+        "variables_to_print": ['x', 'y', 'truthy'],
+    },
+    {
+        "name": "Multiple Escapes in String",
+        "code": r"""
+txt = "Line1\nLine2\tTabbed\\BackslashQuote\""
+""",
+        "variables_to_print": ['txt'],
+    },
+]
+for i,test in enumerate(extra_tough_tests):
     run_test(
         str(i+1) + '. ' + test['name'],
         code=test['code'],

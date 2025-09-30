@@ -3,6 +3,7 @@ from streamBasic import *
 from streamExpression import Expression
 from string import ascii_letters, digits
 from reDefs import reg
+from colorama import init, Fore, Style
 
 letters = ascii_letters + digits
 
@@ -20,7 +21,6 @@ class Parser:
         in_comment = False
         buffer = ""
         line_start = True
-        in_escape = False
 
         def flush_buffer():
             nonlocal buffer
@@ -31,13 +31,6 @@ class Parser:
         for ch in self.code:
             # --- inside string ---
             if in_string:
-                if in_escape:
-                    buffer += ch
-                    in_escape = False
-                    continue
-                if ch == '\\':
-                    in_escape = True
-                    continue
                 if ch == '"':
                     if buffer:
                         tokens.append(String(buffer))
@@ -99,7 +92,7 @@ class Parser:
             if isi(i, (ComStart, Comment, StrStart, StrEnd)):
                 continue
             elif isi(i, String):
-                ast.append(String(i.value))
+                ast.append(String(i.value.replace('\n', '\\n')))
             elif isi(i, Code):
                 ast.append(i)
             elif isi(i, StatementEnd):
@@ -196,11 +189,8 @@ class Converter:
 class Generator:
     def __init__(self, code = None):
         self.ast = code or []
-        self.variables = [
-            {'name': 'true', 'is_const': True},
-            {'name': 'false', 'is_const': True},
-            ]
-        self.functions = [{}]
+        self.variables = []
+        self.functions = []
     
     def find_in_vars(self, value, by='name'):
         return [i for i in self.variables
@@ -208,7 +198,7 @@ class Generator:
     
     def convert(self):
         histroy = []
-        lines = ['from baseLib import *', '___stream_true = True\n___stream_false = False']
+        lines = ['from baseLib import *']
         for idx, i in enumerate(self.ast):
             ind = " " * i.indent
             if isi(i, (Variable, Constant)):
@@ -217,13 +207,13 @@ class Generator:
                 is_const = isi(i, Constant)
                 exists = self.find_in_vars(name)
                 exists = exists[0] if exists else {}
-                
                 # Check for string literal assignment
-                if isinstance(value_str, str) and value_str.startswith('"') and value_str.endswith('"'):
-                    # Process string for interpolation
-                    string_content = value_str[1:-1]  # Remove quotes
-                    stream_string = String(string_content, self.variables, self.functions)
-                    ___stream_value = stream_string.to_python_string()
+                if (
+                    isinstance(value_str, str)
+                    and value_str.startswith('"')
+                    and value_str.endswith('"')
+                ):
+                    ___stream_value = value_str
                 else:
                     value = Expression(
                         value_str,
@@ -232,7 +222,6 @@ class Generator:
                         functions=self.functions
                     )
                     ___stream_value = value.toPy()
-                
                 if exists and ind == exists.get('indent'):
                     if exists.get('is_const'):
                         raise StreamBlockage("You cannot re-assign a constant.")
@@ -245,6 +234,7 @@ class Generator:
                         'name': name,
                         'is_const': is_const,
                         'value': value_str,
+                        'refs': 1,
                         'indent': ind,
                         'id': len(self.variables)
                     })
@@ -263,3 +253,36 @@ class Generator:
                 lines.append(f'{ind}else:')
         return '\n'.join(lines)
 
+init(autoreset=True)
+
+code = """
+x = 2 + 4
+"""
+
+if __name__ == "__main__":
+    parser = Parser(code)
+    ast = Converter(parser.filterStringAndComments()).toAst()
+
+    # Print AST
+    print(f"{Fore.GREEN}|{'-'*10}< AST >{'-'*10}|{Style.RESET_ALL}")
+    width = len(str(len(ast)))
+    for j, node in enumerate(ast):
+        line_number = str(j + 1).rjust(width)
+        print(f" {line_number} {node!r}")
+
+    # Generate Python
+    print(f"\n{Fore.GREEN}|{'-'*10}< PYTHON >{'-'*10}|{Style.RESET_ALL}")
+    gen = Generator(ast)
+    converted = gen.convert()
+    width = len(str(len(converted.splitlines())))
+    for j, node in enumerate(converted.splitlines()):
+        line_number = str(j + 1).rjust(width)
+        print(f" {line_number} {node!r}")
+
+    # Execute and show results
+    converted += "\nprint('x =', ___stream_x)"
+
+    try:
+        exec(converted)
+    except Exception as e:
+        print(e)

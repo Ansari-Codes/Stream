@@ -4,7 +4,7 @@ from typing import Any
 from streamBlockages import StreamBlockage
 from types import MappingProxyType
 from colorama import Fore, Style, init
-from streamExpression import Expression
+
 init(autoreset=True)
 
 def deep_freeze(obj):
@@ -19,40 +19,6 @@ def deep_freeze(obj):
     else:
         return obj
 
-class Operator:
-    operators = {
-        "===": " is ",
-        "!==": " is not ",
-        "<+": "<<",
-        "+>": ">>",
-        "//": "//",
-        "!=": "!=",
-        ":>": " in ",
-        "!>": " not in ",
-        "&&": "&",
-        "||": "|",
-        "><": "^",
-        "~~": "~",
-        "==": "==",
-        ">=": ">=",
-        "<=": "<=",
-        "+": "+",
-        "-": "-",
-        "(": "(",
-        ")": ")",
-        "*": "*",
-        "/": "/",
-        "^": "**",
-        "%": "%",
-        "_": "_",
-        "&": " and ",
-        "|": " or ",
-        "!": " not ",
-        ".": ".",
-        ">": ">",
-        "<": "<",
-    }
-
 class Comment:
     def __init__(self, value):
         self.value = value
@@ -64,88 +30,11 @@ class ComEnd:
     value = "\n"
 
 class String:
-    def __init__(self, value, variables = None, functions = None):
+    def __init__(self, value):
         self.value = value
-        self.variables = variables or [{}]
-        self.functions = functions or [{}]
     
     def __str__(self) -> str:
         return f"{Style.DIM+Fore.RED}STRING{Style.RESET_ALL}({str(self.value)})"
-    
-    def to_python_string(self):
-        """Convert Stream string to Python string with interpolation and escapes"""
-        result = []
-        i = 0
-        n = len(self.value)
-        has_interpolation = False
-
-        while i < n:
-            if self.value[i] == '\\' and i+1 < n:
-                next_char = self.value[i+1]
-                if next_char == 'n':
-                    result.append('\n')
-                    i += 2
-                elif next_char == 't':
-                    result.append('\t')
-                    i += 2
-                elif next_char == '"':
-                    result.append('\"')
-                    i += 2
-                elif next_char == '\\':
-                    result.append('\\')
-                    i += 2
-                elif next_char == '{':
-                    result.append('{')
-                    i += 2
-                elif next_char == '}':
-                    result.append('}')
-                    i += 2
-                else:
-                    result.append('\\')
-                    i += 1
-            elif self.value[i] == '{' and i+1 < n and self.value[i+1] == '{':
-                # Escaped opening brace
-                result.append('{')
-                i += 2
-            elif self.value[i] == '}' and i+1 < n and self.value[i+1] == '}':
-                # Escaped closing brace
-                result.append('}')
-                i += 2
-            elif self.value[i] == '{':
-                # Interpolation
-                has_interpolation = True
-                j = i + 1
-                depth = 1
-                expr = []
-                while j < n and depth > 0:
-                    if self.value[j] == '{':
-                        depth += 1
-                    elif self.value[j] == '}':
-                        depth -= 1
-                        if depth == 0:
-                            break
-                    expr.append(self.value[j])
-                    j += 1
-                if depth == 0:
-                    expr_str = Expression(''.join(expr),
-                                         Operator.operators,
-                                         self.variables,
-                                         self.functions
-                                         ).toPy()
-                    result.append(f'{{{expr_str}}}')
-                    i = j + 1
-                else:
-                    result.append(self.value[i])
-                    i += 1
-            else:
-                result.append(self.value[i])
-                i += 1
-
-        final_str = ''.join(result)
-        if has_interpolation:
-            return f'f"{final_str}"'
-        else:
-            return f'"{final_str}"'
 
 class StrStart:
     value = '"'
@@ -231,3 +120,37 @@ class Return:
     
     def __repr__(self) -> str:
         return f'{Style.DIM}{Fore.LIGHTBLACK_EX}{"| " + " " * self.indent}{Style.RESET_ALL}{Fore.MAGENTA}Return{Style.RESET_ALL}({self.value})'
+
+class Operator:
+    operators = {
+        "===": " is ",
+        "!==": " is not ",
+        "<+": "<<",
+        "+>": ">>",
+        "//": "//",
+        "!=": "!=",
+        ":>": " in ",
+        "!>": " not in ",
+        "&&": "&",
+        "||": "|",
+        "><": "^",
+        "~~": "~",
+        "==": "==",
+        ">=": ">=",
+        "<=": "<=",
+        "+": "+",
+        "-": "-",
+        "(": "(",
+        ")": ")",
+        "*": "*",
+        "/": "/",
+        "^": "**",
+        "%": "%",
+        "_": "_",
+        "&": " and ",
+        "|": " or ",
+        "!": " not ",
+        ".": ".",
+        ">": ">",
+        "<": "<",
+    }
